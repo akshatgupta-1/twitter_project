@@ -1,0 +1,101 @@
+// SPDX-License-Identifier: MIT
+
+pragma solidity >=0.8.0;
+
+contract twitter{
+
+    struct Tweet{            //contains info about the id of the user, address, content to be tweeted and time .
+        uint id;
+        address author;
+        string content;
+        uint createdAt;
+    }
+
+    struct Message{          //contains detailed info of the content to be tweeted 
+        uint id;
+        string content;
+        address from;
+        address to;
+        uint createdAt;
+    }
+
+    mapping(uint=>Tweet) public tweets;                             //keeps info for tweets
+    mapping(address=>uint[]) public tweetsOf;                       //keep all id's of twitter
+    mapping(address=>Message[]) public conversations;                  //keeps info about messages
+    mapping(address=>mapping(address=>bool)) public operators;      //keeps track to give account access to others
+    mapping(address=>address[]) public following;                   //keeps tracks of user following
+
+    uint nextId;
+    uint nextMessageId;
+
+    function _tweet(address _from, string memory _content) internal{
+        require(_from==msg.sender || operators[_from][msg.sender],"You don't have access"); //tweet access check - owner,authority
+        tweets[nextId] = Tweet(nextId,_from,_content,block.timestamp);
+        tweetsOf[_from].push(nextId);
+        nextId++;
+    }
+
+    function _sendmessage(address _from, address _to, string memory _content) internal{
+        require(_from==msg.sender || operators[_from][msg.sender],"You don't have access");
+        conversations[_from].push(Message(nextMessageId,_content,_from,_to,block.timestamp));
+        nextMessageId++;
+    }
+
+    function tweet(string memory _content) public{          //if tweet is to be made by the owner of account itself
+        _tweet(msg.sender,_content);
+    }
+
+    function tweet(address _from, string memory _content) public{       //if owner has given account access to other person and that person wants to tweet.
+        _tweet(_from,_content);
+    }
+
+    function sendmessage(address _to, string memory _content) public{       //if message is to be sent by owner of account itself
+        _sendmessage(msg.sender,_to,_content);
+    }
+
+    function sendmessage(address _from,address _to, string memory _content) public{        //if message is to be sent by other person who has access to owner account 
+        _sendmessage(_from,_to,_content);
+    }
+
+    function follow(address _to) public{            //following other users on twitter
+        following[msg.sender].push(_to);
+    }
+
+    function allow(address _operator) public{       //owner giving account access to operator 
+        operators[msg.sender][_operator] = true; 
+    }
+
+    function disallow(address _operator) public{    //owner taking back account access from operator
+        operators[msg.sender][_operator] = false; 
+    }
+
+    function getLatestTweets(uint count) public view returns(Tweet[] memory){
+        require(count>0 && count<=nextId, "Invalid count number");
+        Tweet[] memory _tweets = new Tweet[](count);
+
+        uint j;                                         //fetching latest tweets using array
+        for(uint i=nextId-count; i<nextId; i++){
+            Tweet storage structure = tweets[i];
+            _tweets[j] = Tweet(structure.id,structure.author,structure.content,structure.createdAt);
+            j++;
+        }
+
+        return _tweets;
+    }
+
+    function getLatestTweetsOfUser(address _user, uint count) public view returns(Tweet[] memory) {
+        require(count>0 && count<=nextId, "Invalid count number");
+        Tweet[] memory _tweets = new Tweet[](count);                    //fetching latest tweets of a user
+        uint[] memory ids = tweetsOf[_user];
+
+        uint j;                                         
+        for(uint i=ids.length-count; i<ids.length; i++){
+            Tweet storage structure = tweets[ids[i]];
+            _tweets[j] = Tweet(structure.id,structure.author,structure.content,structure.createdAt);
+            j++;
+        }
+
+        return _tweets;
+    }
+
+}
